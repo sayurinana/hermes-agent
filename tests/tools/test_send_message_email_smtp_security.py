@@ -123,3 +123,11 @@ def test_invalid_security_fails_clearly_without_connecting_smtp():
     assert "bogus" in error_text
     mock_smtp.assert_not_called()
     mock_smtp_ssl.assert_not_called()
+
+
+def test_smtps_alias_uses_implicit_tls():
+    _assert_one_shot_uses_implicit_tls(port=2525, security="smtps")
+
+
+def test_start_tls_alias_uses_starttls():
+    _assert_one_shot_uses_starttls(port=465, security="start_tls")
