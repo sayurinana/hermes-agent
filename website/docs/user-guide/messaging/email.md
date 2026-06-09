@@ -76,7 +76,8 @@ EMAIL_ALLOWED_USERS=your@email.com,colleague@work.com
 
 # Optional
 EMAIL_IMAP_PORT=993                    # Default: 993 (IMAP SSL)
-EMAIL_SMTP_PORT=587                    # Default: 587 (SMTP STARTTLS)
+EMAIL_SMTP_PORT=587                    # Default: 587
+EMAIL_SMTP_SECURITY=auto               # Default: auto (465=implicit TLS, other ports=STARTTLS)
 EMAIL_POLL_INTERVAL=15                 # Seconds between inbox checks (default: 15)
 EMAIL_HOME_ADDRESS=your@email.com      # Default delivery target for cron jobs
 ```
@@ -117,10 +118,25 @@ The adapter polls the IMAP inbox for UNSEEN messages at a configurable interval 
 
 Replies are sent via SMTP with proper email threading:
 
+- **SMTP security** is controlled by `EMAIL_SMTP_SECURITY` (default: `auto`). `auto` uses implicit TLS / `SMTP_SSL` on port `465`, and SMTP + `STARTTLS` on port `587` or any other non-465 port.
+- **Explicit overrides** are available for custom/self-hosted SMTP deployments: set `EMAIL_SMTP_SECURITY=starttls` to force SMTP + `STARTTLS`, or `EMAIL_SMTP_SECURITY=implicit_tls` to force implicit TLS / `SMTP_SSL` regardless of port.
+- **Aliases accepted:** `start_tls` and `start-tls` map to `starttls`; `implicit-tls`, `smtps`, and `smtp_ssl` map to `implicit_tls`. Values are case-insensitive. Invalid values fail clearly during send/connect instead of silently falling back.
 - **In-Reply-To** and **References** headers maintain the thread
 - **Subject line** preserved with `Re:` prefix (no double `Re: Re:`)
 - **Message-ID** generated with the agent's domain
 - Responses are sent as plain text (UTF-8)
+
+Examples for custom SMTP deployments:
+
+```bash
+# Port 587 server that expects STARTTLS
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_SECURITY=starttls
+
+# Port 465 server that expects implicit TLS / SMTP_SSL
+EMAIL_SMTP_PORT=465
+EMAIL_SMTP_SECURITY=implicit_tls
+```
 
 ### File Attachments
 
@@ -159,7 +175,8 @@ Email access follows the same pattern as all other Hermes platforms:
 | Problem | Solution |
 |---------|----------|
 | **"IMAP connection failed"** at startup | Verify `EMAIL_IMAP_HOST` and `EMAIL_IMAP_PORT`. Ensure IMAP is enabled on the account. For Gmail, enable it in Settings → Forwarding and POP/IMAP. |
-| **"SMTP connection failed"** at startup | Verify `EMAIL_SMTP_HOST` and `EMAIL_SMTP_PORT`. Check that your password is correct (use App Password for Gmail). |
+| **"SMTP connection failed"** at startup | Verify `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, and `EMAIL_SMTP_SECURITY`. For port 465 use `EMAIL_SMTP_SECURITY=implicit_tls` (or leave `auto`); for port 587 use `starttls` (or leave `auto`). Check that your password is correct (use App Password for Gmail). |
+| **Invalid `EMAIL_SMTP_SECURITY` value** | Use `auto`, `starttls`, or `implicit_tls` (`start_tls`, `start-tls`, `implicit-tls`, `smtps`, and `smtp_ssl` are accepted aliases). Ambiguous `tls`/`ssl` and plaintext/no-TLS modes are rejected. |
 | **Messages not received** | Check `EMAIL_ALLOWED_USERS` includes the sender's email. Check spam folder — some providers flag automated replies. |
 | **"Authentication failed"** | For Gmail, you must use an App Password, not your regular password. Ensure 2FA is enabled first. |
 | **Duplicate replies** | Ensure only one gateway instance is running. Check `hermes gateway status`. |
@@ -177,7 +194,7 @@ Email access follows the same pattern as all other Hermes platforms:
 - Use **App Passwords** instead of your main password (required for Gmail with 2FA)
 - Set `EMAIL_ALLOWED_USERS` to restrict who can interact with the agent
 - The password is stored in `~/.hermes/.env` — protect this file (`chmod 600`)
-- IMAP uses SSL (port 993) and SMTP uses STARTTLS (port 587) by default — connections are encrypted
+- IMAP uses SSL (port 993) by default. SMTP uses `EMAIL_SMTP_SECURITY=auto`: port 465 uses implicit TLS / `SMTP_SSL`, and port 587 or any other non-465 port uses SMTP + `STARTTLS` — connections are encrypted.
 
 ---
 
@@ -191,6 +208,7 @@ Email access follows the same pattern as all other Hermes platforms:
 | `EMAIL_SMTP_HOST` | Yes | — | SMTP server host (e.g., `smtp.gmail.com`) |
 | `EMAIL_IMAP_PORT` | No | `993` | IMAP server port |
 | `EMAIL_SMTP_PORT` | No | `587` | SMTP server port |
+| `EMAIL_SMTP_SECURITY` | No | `auto` | SMTP transport security: `auto` (port 465 = implicit TLS / `SMTP_SSL`; other ports = SMTP + `STARTTLS`), `starttls`, or `implicit_tls`. Aliases: `start_tls`, `start-tls`, `implicit-tls`, `smtps`, `smtp_ssl`. Invalid values fail clearly. |
 | `EMAIL_POLL_INTERVAL` | No | `15` | Seconds between inbox checks |
 | `EMAIL_ALLOWED_USERS` | No | — | Comma-separated allowed sender addresses |
 | `EMAIL_HOME_ADDRESS` | No | — | Default delivery target for cron jobs |

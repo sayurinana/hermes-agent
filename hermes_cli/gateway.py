@@ -4050,6 +4050,12 @@ _PLATFORMS = [
                 "help": "e.g., smtp.gmail.com for Gmail, smtp.office365.com for Outlook.",
             },
             {
+                "name": "EMAIL_SMTP_SECURITY",
+                "prompt": "SMTP security mode (auto/starttls/implicit_tls, optional)",
+                "password": False,
+                "help": "Optional. Default auto uses SMTP_SSL on port 465 and SMTP+STARTTLS on other ports. Use starttls or implicit_tls to override custom SMTP deployments.",
+            },
+            {
                 "name": "EMAIL_ALLOWED_USERS",
                 "prompt": "Allowed sender emails (comma-separated)",
                 "password": False,

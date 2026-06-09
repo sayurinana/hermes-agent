@@ -10,11 +10,14 @@ import json
 import logging
 import os
 import re
+import smtplib
 import ssl
 import time
+from email.mime.text import MIMEText
 from email.utils import formatdate
 
 from agent.redact import redact_sensitive_text
+from gateway.email_smtp import SMTP_TIMEOUT_SECONDS, open_smtp_connection
 
 logger = logging.getLogger(__name__)
 
@@ -1297,9 +1300,6 @@ async def _send_signal(extra, chat_id, message, media_files=None):
 
 async def _send_email(extra, chat_id, message):
     """Send via SMTP (one-shot, no persistent connection needed)."""
-    import smtplib
-    from email.mime.text import MIMEText
-
     address = extra.get("address") or os.getenv("EMAIL_ADDRESS", "")
     password = os.getenv("EMAIL_PASSWORD", "")
     smtp_host = extra.get("smtp_host") or os.getenv("EMAIL_SMTP_HOST", "")
@@ -1318,11 +1318,19 @@ async def _send_email(extra, chat_id, message):
         msg["Subject"] = "Hermes Agent"
         msg["Date"] = formatdate(localtime=True)
 
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls(context=ssl.create_default_context())
-        server.login(address, password)
-        server.send_message(msg)
-        server.quit()
+        server = open_smtp_connection(
+            smtp_host,
+            smtp_port,
+            os.getenv("EMAIL_SMTP_SECURITY"),
+            timeout=SMTP_TIMEOUT_SECONDS,
+            smtp_module=smtplib,
+            context_factory=ssl.create_default_context,
+        )
+        try:
+            server.login(address, password)
+            server.send_message(msg)
+        finally:
+            server.quit()
         return {"success": True, "platform": "email", "chat_id": chat_id}
     except Exception as e:
         return _error(f"Email send failed: {e}")

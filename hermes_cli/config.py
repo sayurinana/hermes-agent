@@ -3400,6 +3400,14 @@ OPTIONAL_ENV_VARS = {
         "category": "messaging",
         "advanced": True,
     },
+    "EMAIL_SMTP_SECURITY": {
+        "description": "SMTP transport security for email sends: auto (465=implicit TLS / SMTP_SSL, other ports=STARTTLS), starttls, or implicit_tls. Aliases: start_tls, start-tls, implicit-tls, smtps, smtp_ssl.",
+        "prompt": "Email SMTP security mode (auto/starttls/implicit_tls)",
+        "url": None,
+        "password": False,
+        "category": "messaging",
+        "advanced": True,
+    },
     "GATEWAY_ALLOW_ALL_USERS": {
         "description": "Allow all users to interact with messaging bots (true/false). Default: false.",
         "prompt": "Allow all users (true/false)",

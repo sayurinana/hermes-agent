@@ -317,6 +317,7 @@ description: "Hermes Agent 使用的所有环境变量完整参考"
 | `EMAIL_IMAP_PORT` | IMAP 端口 |
 | `EMAIL_SMTP_HOST` | 邮件适配器的 SMTP 主机名 |
 | `EMAIL_SMTP_PORT` | SMTP 端口 |
+| `EMAIL_SMTP_SECURITY` | Email gateway 适配器和一次性邮件发送使用的 SMTP 传输安全模式。默认 `auto` 在端口 465 使用隐式 TLS / `SMTP_SSL`，在端口 587 或任何非 465 端口使用 SMTP + `STARTTLS`。接受的标准值：`auto`、`starttls`、`implicit_tls`；别名：`start_tls`、`start-tls`、`implicit-tls`、`smtps`、`smtp_ssl`。无效值会清晰失败。 |
 | `EMAIL_ALLOWED_USERS` | 允许向 bot 发送消息的逗号分隔邮箱地址 |
 | `EMAIL_HOME_ADDRESS` | 主动邮件投递的默认收件人 |
 | `EMAIL_HOME_ADDRESS_NAME` | 邮件主目标的显示名称 |

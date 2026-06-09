@@ -69,7 +69,8 @@ EMAIL_ALLOWED_USERS=your@email.com,colleague@work.com
 
 # 可选
 EMAIL_IMAP_PORT=993                    # 默认：993（IMAP SSL）
-EMAIL_SMTP_PORT=587                    # 默认：587（SMTP STARTTLS）
+EMAIL_SMTP_PORT=587                    # 默认：587
+EMAIL_SMTP_SECURITY=auto               # 默认：auto（465=隐式 TLS，其他端口=STARTTLS）
 EMAIL_POLL_INTERVAL=15                 # 收件箱检查间隔（秒），默认：15
 EMAIL_HOME_ADDRESS=your@email.com      # cron 任务的默认投递目标
 ```
@@ -110,10 +111,25 @@ sudo hermes gateway install --system   # 仅 Linux：开机自启的系统服务
 
 回复通过 SMTP 发送，并正确维护邮件线程：
 
+- **SMTP 安全模式**由 `EMAIL_SMTP_SECURITY` 控制（默认：`auto`）。`auto` 在端口 `465` 使用隐式 TLS / `SMTP_SSL`，在端口 `587` 或任何非 465 端口使用 SMTP + `STARTTLS`。
+- **自定义/自托管 SMTP** 可显式覆盖：设置 `EMAIL_SMTP_SECURITY=starttls` 强制 SMTP + `STARTTLS`，或设置 `EMAIL_SMTP_SECURITY=implicit_tls` 强制隐式 TLS / `SMTP_SSL`，不受端口影响。
+- **可接受别名**：`start_tls`、`start-tls` 映射到 `starttls`；`implicit-tls`、`smtps`、`smtp_ssl` 映射到 `implicit_tls`。值不区分大小写。无效值会在发送/连接时清晰失败，不会静默回退。
 - **In-Reply-To** 和 **References** 头部用于维持线程
 - **主题行**保留并添加 `Re:` 前缀（不会出现 `Re: Re:` 重复）
 - **Message-ID** 使用 Agent 的域名生成
 - 回复以纯文本（UTF-8）发送
+
+自定义 SMTP 部署示例：
+
+```bash
+# 端口 587 服务期望 STARTTLS
+EMAIL_SMTP_PORT=587
+EMAIL_SMTP_SECURITY=starttls
+
+# 端口 465 服务期望隐式 TLS / SMTP_SSL
+EMAIL_SMTP_PORT=465
+EMAIL_SMTP_SECURITY=implicit_tls
+```
 
 ### 文件附件
 
@@ -152,7 +168,8 @@ platforms:
 | 问题 | 解决方案 |
 |---------|----------|
 | 启动时出现 **"IMAP connection failed"** | 检查 `EMAIL_IMAP_HOST` 和 `EMAIL_IMAP_PORT`。确保账户已启用 IMAP。对于 Gmail，在设置 → 转发和 POP/IMAP 中启用。 |
-| 启动时出现 **"SMTP connection failed"** | 检查 `EMAIL_SMTP_HOST` 和 `EMAIL_SMTP_PORT`。确认密码正确（Gmail 请使用应用专用密码）。 |
+| 启动时出现 **"SMTP connection failed"** | 检查 `EMAIL_SMTP_HOST`、`EMAIL_SMTP_PORT` 和 `EMAIL_SMTP_SECURITY`。端口 465 使用 `EMAIL_SMTP_SECURITY=implicit_tls`（或保持 `auto`）；端口 587 使用 `starttls`（或保持 `auto`）。确认密码正确（Gmail 请使用应用专用密码）。 |
+| `EMAIL_SMTP_SECURITY` 值无效 | 使用 `auto`、`starttls` 或 `implicit_tls`（也接受别名 `start_tls`、`start-tls`、`implicit-tls`、`smtps`、`smtp_ssl`）。含义模糊的 `tls`/`ssl` 以及明文/无 TLS 模式会被拒绝。 |
 | **未收到邮件** | 检查 `EMAIL_ALLOWED_USERS` 是否包含发件人邮箱。检查垃圾邮件文件夹——部分服务商会将自动回复标记为垃圾邮件。 |
 | **"Authentication failed"** | 对于 Gmail，必须使用应用专用密码，而非常规密码。请先确保已启用双重验证。 |
 | **重复回复** | 确保只有一个 gateway 实例在运行。检查 `hermes gateway status`。 |
@@ -170,7 +187,7 @@ platforms:
 - 使用**应用专用密码**代替主密码（Gmail 开启双重验证后必须如此）
 - 设置 `EMAIL_ALLOWED_USERS` 以限制可与 Agent 交互的用户
 - 密码存储在 `~/.hermes/.env` 中——请保护此文件（`chmod 600`）
-- IMAP 默认使用 SSL（端口 993），SMTP 默认使用 STARTTLS（端口 587）——连接已加密
+- IMAP 默认使用 SSL（端口 993）。SMTP 默认使用 `EMAIL_SMTP_SECURITY=auto`：端口 465 使用隐式 TLS / `SMTP_SSL`，端口 587 或任何非 465 端口使用 SMTP + `STARTTLS`——连接已加密
 
 ---
 
@@ -184,6 +201,7 @@ platforms:
 | `EMAIL_SMTP_HOST` | 是 | — | SMTP 服务器主机（例如 `smtp.gmail.com`） |
 | `EMAIL_IMAP_PORT` | 否 | `993` | IMAP 服务器端口 |
 | `EMAIL_SMTP_PORT` | 否 | `587` | SMTP 服务器端口 |
+| `EMAIL_SMTP_SECURITY` | 否 | `auto` | SMTP 传输安全模式：`auto`（端口 465 = 隐式 TLS / `SMTP_SSL`；其他端口 = SMTP + `STARTTLS`）、`starttls` 或 `implicit_tls`。别名：`start_tls`、`start-tls`、`implicit-tls`、`smtps`、`smtp_ssl`。无效值会清晰失败。 |
 | `EMAIL_POLL_INTERVAL` | 否 | `15` | 收件箱检查间隔（秒） |
 | `EMAIL_ALLOWED_USERS` | 否 | — | 允许的发件人地址，逗号分隔 |
 | `EMAIL_HOME_ADDRESS` | 否 | — | cron 任务的默认投递目标 |

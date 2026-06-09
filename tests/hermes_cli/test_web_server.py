@@ -1062,8 +1062,12 @@ class TestWebServerEndpoints:
         assert "DISCORD_HOME_CHANNEL" in discord["env_vars"]
         assert "DISCORD_ALLOW_ALL_USERS" in discord["env_vars"]
 
+        email = _build_catalog_entry("email")
+        assert "EMAIL_SMTP_SECURITY" in email["env_vars"]
+
         managed = _channel_managed_env_keys()
         assert "DISCORD_HOME_CHANNEL" in managed
+        assert "EMAIL_SMTP_SECURITY" in managed
         assert "BLUEBUBBLES_ALLOW_ALL_USERS" in managed
         assert "MATTERMOST_ALLOW_ALL_USERS" in managed
         assert "GATEWAY_PROXY_URL" not in managed

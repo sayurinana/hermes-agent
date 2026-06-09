@@ -175,6 +175,7 @@ class TestProviderEnvBlocklist:
             "SIGNAL_ACCOUNT": "+15555550124",
             "HASS_TOKEN": "ha-secret",
             "EMAIL_PASSWORD": "email-secret",
+            "EMAIL_SMTP_SECURITY": "implicit_tls",
             "FIRECRAWL_API_KEY": "fc-secret",
             "HERMES_DASHBOARD_SESSION_TOKEN": "dashboard-session-secret",
             "BROWSERBASE_PROJECT_ID": "bb-project",

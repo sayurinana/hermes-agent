@@ -324,6 +324,7 @@ For cloud sandbox backends, persistence is filesystem-oriented. `TERMINAL_LIFETI
 | `EMAIL_IMAP_PORT` | IMAP port |
 | `EMAIL_SMTP_HOST` | SMTP hostname for the email adapter |
 | `EMAIL_SMTP_PORT` | SMTP port |
+| `EMAIL_SMTP_SECURITY` | SMTP transport security for the Email gateway adapter and one-shot email sends. Default `auto` uses implicit TLS / `SMTP_SSL` on port 465 and SMTP + `STARTTLS` on port 587 or any non-465 port. Accepted canonical values: `auto`, `starttls`, `implicit_tls`; aliases: `start_tls`, `start-tls`, `implicit-tls`, `smtps`, `smtp_ssl`. Invalid values fail clearly. |
 | `EMAIL_ALLOWED_USERS` | Comma-separated email addresses allowed to message the bot |
 | `EMAIL_HOME_ADDRESS` | Default recipient for proactive email delivery |
 | `EMAIL_HOME_ADDRESS_NAME` | Display name for the email home target |

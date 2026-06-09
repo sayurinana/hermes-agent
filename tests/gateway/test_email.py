@@ -519,6 +519,7 @@ class TestThreadContext(unittest.TestCase):
             "EMAIL_PASSWORD": "secret",
             "EMAIL_IMAP_HOST": "imap.test.com",
             "EMAIL_SMTP_HOST": "smtp.test.com",
+            "EMAIL_SMTP_PORT": "587",
         }):
             from gateway.platforms.email import EmailAdapter
             adapter = EmailAdapter(PlatformConfig(enabled=True))
@@ -616,6 +617,7 @@ class TestSendMethods(unittest.TestCase):
             "EMAIL_PASSWORD": "secret",
             "EMAIL_IMAP_HOST": "imap.test.com",
             "EMAIL_SMTP_HOST": "smtp.test.com",
+            "EMAIL_SMTP_PORT": "587",
         }):
             from gateway.platforms.email import EmailAdapter
             adapter = EmailAdapter(PlatformConfig(enabled=True))
@@ -654,6 +656,7 @@ class TestSendMethods(unittest.TestCase):
 
             self.assertFalse(result.success)
             self.assertIn("Connection refused", result.error)
+
 
     def test_send_image_includes_url(self):
         """send_image should include image URL in email body."""
@@ -725,6 +728,144 @@ class TestSendMethods(unittest.TestCase):
         self.assertEqual(info["subject"], "Test")
 
 
+class TestSmtpSecurityPolicy(unittest.TestCase):
+    """EMAIL_SMTP_SECURITY selects the SMTP transport used by EmailAdapter sends."""
+
+    def _make_adapter(self, *, port: int, security: str | None = None):
+        from gateway.config import PlatformConfig
+
+        env = {
+            "EMAIL_ADDRESS": "hermes@test.com",
+            "EMAIL_PASSWORD": "secret",
+            "EMAIL_IMAP_HOST": "imap.test.com",
+            "EMAIL_SMTP_HOST": "smtp.test.com",
+            "EMAIL_SMTP_PORT": str(port),
+        }
+        if security is not None:
+            env["EMAIL_SMTP_SECURITY"] = security
+        with patch.dict(os.environ, env, clear=True):
+            from gateway.platforms.email import EmailAdapter
+            return EmailAdapter(PlatformConfig(enabled=True))
+
+    def _assert_send_uses_starttls(self, *, port: int, security: str | None = None):
+        adapter = self._make_adapter(port=port, security=security)
+        tls_context = object()
+        with patch("gateway.platforms.email.ssl.create_default_context", return_value=tls_context), \
+             patch("gateway.platforms.email.smtplib.SMTP") as mock_smtp, \
+             patch("gateway.platforms.email.smtplib.SMTP_SSL") as mock_smtp_ssl:
+            mock_server = MagicMock()
+            mock_smtp.return_value = mock_server
+
+            adapter._send_email("user@test.com", "hello", None)
+
+        mock_smtp.assert_called_once_with("smtp.test.com", port, timeout=30)
+        mock_smtp_ssl.assert_not_called()
+        mock_server.starttls.assert_called_once_with(context=tls_context)
+        mock_server.login.assert_called_once_with("hermes@test.com", "secret")
+        mock_server.send_message.assert_called_once()
+
+    def _assert_send_uses_implicit_tls(
+        self,
+        *,
+        port: int,
+        security: str | None = None,
+        send_call=None,
+    ):
+        adapter = self._make_adapter(port=port, security=security)
+        tls_context = object()
+        with patch("gateway.platforms.email.ssl.create_default_context", return_value=tls_context), \
+             patch("gateway.platforms.email.smtplib.SMTP") as mock_smtp, \
+             patch("gateway.platforms.email.smtplib.SMTP_SSL") as mock_smtp_ssl:
+            mock_server = MagicMock()
+            mock_smtp_ssl.return_value = mock_server
+
+            if send_call is None:
+                adapter._send_email("user@test.com", "hello", None)
+            else:
+                send_call(adapter)
+
+        mock_smtp.assert_not_called()
+        mock_smtp_ssl.assert_called_once_with(
+            "smtp.test.com", port, timeout=30, context=tls_context
+        )
+        mock_server.starttls.assert_not_called()
+        mock_server.login.assert_called_once_with("hermes@test.com", "secret")
+        mock_server.send_message.assert_called_once()
+
+    def test_unset_security_uses_smtp_ssl_for_port_465(self):
+        self._assert_send_uses_implicit_tls(port=465)
+
+    def test_auto_security_uses_smtp_ssl_for_port_465(self):
+        self._assert_send_uses_implicit_tls(port=465, security="auto")
+
+    def test_unset_security_uses_starttls_for_port_587(self):
+        self._assert_send_uses_starttls(port=587)
+
+    def test_auto_security_uses_starttls_for_non_465_port(self):
+        self._assert_send_uses_starttls(port=2525, security="auto")
+
+    def test_explicit_starttls_uses_starttls_even_on_port_465(self):
+        self._assert_send_uses_starttls(port=465, security="starttls")
+
+    def test_explicit_implicit_tls_uses_smtp_ssl_even_on_non_465_port(self):
+        self._assert_send_uses_implicit_tls(port=587, security="implicit_tls")
+
+    def test_single_attachment_send_uses_smtp_ssl_for_port_465(self):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+            f.write(b"document")
+            tmp_path = f.name
+
+        try:
+            self._assert_send_uses_implicit_tls(
+                port=465,
+                send_call=lambda adapter: adapter._send_email_with_attachment(
+                    "user@test.com", "caption", tmp_path
+                ),
+            )
+        finally:
+            os.unlink(tmp_path)
+
+    def test_multi_attachment_send_uses_explicit_implicit_tls_on_non_465_port(self):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+            f.write(b"document")
+            tmp_path = f.name
+
+        try:
+            self._assert_send_uses_implicit_tls(
+                port=2525,
+                security="implicit_tls",
+                send_call=lambda adapter: adapter._send_email_with_attachments(
+                    "user@test.com", "caption", [tmp_path]
+                ),
+            )
+        finally:
+            os.unlink(tmp_path)
+
+    def test_invalid_security_fails_clearly_without_connecting_smtp(self):
+        import asyncio
+
+        with patch("gateway.platforms.email.smtplib.SMTP") as mock_smtp, \
+             patch("gateway.platforms.email.smtplib.SMTP_SSL") as mock_smtp_ssl:
+            try:
+                adapter = self._make_adapter(port=587, security="bogus")
+                result = asyncio.run(adapter.send("user@test.com", "hello"))
+            except Exception as exc:  # clear config-time failure is acceptable
+                error_text = str(exc)
+            else:
+                self.assertFalse(result.success)
+                self.assertIsNotNone(result.error)
+                error_text = result.error or ""
+
+        self.assertIn("EMAIL_SMTP_SECURITY", error_text)
+        self.assertIn("bogus", error_text)
+        mock_smtp.assert_not_called()
+        mock_smtp_ssl.assert_not_called()
+
+
 class TestConnectDisconnect(unittest.TestCase):
     """Test IMAP/SMTP connection lifecycle."""
 
@@ -735,6 +876,7 @@ class TestConnectDisconnect(unittest.TestCase):
             "EMAIL_PASSWORD": "secret",
             "EMAIL_IMAP_HOST": "imap.test.com",
             "EMAIL_SMTP_HOST": "smtp.test.com",
+            "EMAIL_SMTP_PORT": "587",
         }):
             from gateway.platforms.email import EmailAdapter
             adapter = EmailAdapter(PlatformConfig(enabled=True))
@@ -813,6 +955,7 @@ class TestFetchNewMessages(unittest.TestCase):
             "EMAIL_PASSWORD": "secret",
             "EMAIL_IMAP_HOST": "imap.test.com",
             "EMAIL_SMTP_HOST": "smtp.test.com",
+            "EMAIL_SMTP_PORT": "587",
         }):
             from gateway.platforms.email import EmailAdapter
             adapter = EmailAdapter(PlatformConfig(enabled=True))
@@ -983,6 +1126,7 @@ class TestSendEmailStandalone(unittest.TestCase):
         "EMAIL_ADDRESS": "hermes@test.com",
         "EMAIL_PASSWORD": "secret",
         "EMAIL_SMTP_HOST": "smtp.test.com",
+        "EMAIL_SMTP_PORT": "587",
     })
     def test_send_email_tool_failure(self):
         """SMTP failure should return error dict."""
